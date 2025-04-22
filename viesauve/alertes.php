@@ -14,19 +14,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $latitude = $data['latitude'] ?? null;
     $longitude = $data['longitude'] ?? null;
     $servicetype = $data['serviceType'] ?? null;
+    $secteur_id = $data['secteur_id'] ?? null;
     $etat = 'nouvelle';  // Valeur par défaut
 
     // Vérification des données reçues
-    if ($id_user && $message && $latitude && $longitude && $servicetype) {
+    if ($id_user && $message && $latitude && $longitude && $servicetype && $secteur_id) {
         
         // Préparation de la requête SQL
-        $stmt = $connect->prepare("INSERT INTO alertes (user_id, messages, locations, serviceType, etat) VALUES (?, ?, ST_GeomFromText(?), ?, ?)");
+        $stmt = $connect->prepare("INSERT INTO alertes (user_id, messages, locations, serviceType, secteur_id, etat) VALUES (?, ?, ST_GeomFromText(?), ?, ?, ?)");
         
         // Création de la géométrie point pour la localisation
         $point = "POINT($longitude $latitude)";
         
         // Lier les paramètres
-        $stmt->bind_param("sssss", $id_user, $message, $point, $servicetype, $etat);
+        $stmt->bind_param("ssssss", $id_user, $message, $point, $servicetype, $secteur_id, $etat);
         
         // Exécution de la requête
         if ($stmt->execute()) {

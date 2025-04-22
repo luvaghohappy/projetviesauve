@@ -15,6 +15,7 @@ $noms = trim(htmlspecialchars($_POST["noms"]));
 $sexe = trim(htmlspecialchars($_POST["sexe"]));
 $date_naissance = trim($_POST["date_naissance"]);
 $adresse = trim(htmlspecialchars($_POST["adresse"]));
+$secteur_id = trim(htmlspecialchars($_POST["secteur_id"]));
 $telephone = trim($_POST["telephone"]);
 $email = trim($_POST["email"]);
 $etat_civil = trim(htmlspecialchars($_POST["etat_civil"]));
@@ -30,7 +31,7 @@ $mot_de_passe = trim($_POST["mot_de_passe"]);
 $conf_passe = trim($_POST["conf_passe"]);
 
 // Vérification des champs obligatoires
-if (empty($noms) || empty($sexe) || empty($date_naissance) || empty($adresse) || empty($telephone) || empty($email) || empty($etat_civil) || empty($groupe_sanguin) || empty($mot_de_passe) || empty($conf_passe)) {
+if (empty($noms) || empty($sexe) || empty($date_naissance) || empty($adresse) || empty($secteur_id) || empty($telephone) || empty($email) || empty($etat_civil) || empty($groupe_sanguin) || empty($mot_de_passe) || empty($conf_passe)) {
     http_response_code(400);
     echo json_encode(["status" => "failed", "error" => "Tous les champs obligatoires doivent être remplis."]);
     exit;
@@ -86,14 +87,14 @@ if ($check !== false) {
     if (move_uploaded_file($_FILES["image"]["tmp_name"], $target_file)) {
         try {
             // Insertion des données utilisateur
-            $stmt = $connect->prepare("INSERT INTO utilisateurs (noms, sexe, date_naissance, adresse, telephone, email, etat_civil, groupe_sanguin,allergies, maladies, medicaments, contact_urgence_nom, contact_urgence_lien, contact_urgence_tel, mot_de_passe, image_path)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $connect->prepare("INSERT INTO utilisateurs (noms, sexe, date_naissance, adresse, secteur_id, telephone, email, etat_civil, groupe_sanguin,allergies, maladies, medicaments, contact_urgence_nom, contact_urgence_lien, contact_urgence_tel, mot_de_passe, image_path)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             
             if ($stmt === false) {
                 die("Erreur dans la requête prepare: " . $connect->error);
             }
             
-            $stmt->bind_param("ssssssssssssssss", $noms, $sexe, $date_naissance, $adresse, $telephone, $email, $etat_civil, $groupe_sanguin, $allergies, $maladies, $medicaments, $contact_urgence_nom, $contact_urgence_lien, $contact_urgence_tel, $hashed_password, $target_file);
+            $stmt->bind_param("sssssssssssssssss", $noms, $sexe, $date_naissance, $adresse, $secteur_id, $telephone, $email, $etat_civil, $groupe_sanguin, $allergies, $maladies, $medicaments, $contact_urgence_nom, $contact_urgence_lien, $contact_urgence_tel, $hashed_password, $target_file);
             
                if ($stmt->execute()) {
                  $id_user = $connect->insert_id;
@@ -125,9 +126,12 @@ if ($check !== false) {
                     }
                 }
                    $stmt_child->close();
-                }
-                
-                echo json_encode(["success" => true, "id_user" => $id_user]);
+                }     
+                echo json_encode([
+                    "success" => true,
+                    "id_user" => $id_user,
+                    "secteur_id" => $secteur_id
+                  ]);                  
                 } else {
                 http_response_code(500);
                 echo json_encode(["status" => "failed", "error" => "Erreur lors de l'insertion dans la base de données."]);
