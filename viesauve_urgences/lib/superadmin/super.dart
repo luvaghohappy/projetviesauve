@@ -1,9 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:viesauve_urgences/logins/loginpage.dart';
 import 'package:viesauve_urgences/superadmin/add.dart';
-
+import 'package:fl_chart/fl_chart.dart';
+import 'package:http/http.dart' as http;
+import 'package:viesauve_urgences/superadmin/rapport.dart';
 import '../const.dart' as AppConstants;
+import 'supervision.dart';
 
 class SuperAdminPage extends StatefulWidget {
   final bool isDarkMode;
@@ -15,7 +19,7 @@ class SuperAdminPage extends StatefulWidget {
 }
 
 class _SuperAdminPageState extends State<SuperAdminPage> {
-  Widget _selectedPage = Statuts();
+  Widget _selectedPage = DashboardPage();
 
   void _onMenuItemSelected(Widget page) {
     setState(() {
@@ -32,6 +36,7 @@ class _SuperAdminPageState extends State<SuperAdminPage> {
             onItemSelected: _onMenuItemSelected,
             isDarkMode: widget.isDarkMode,
           ),
+          SizedBox(width: 10),
           Expanded(child: _selectedPage),
         ],
       ),
@@ -88,75 +93,75 @@ class _SideMenuState extends State<SideMenu> {
   Widget build(BuildContext context) {
     final imageUrl = "${AppConstants.baseUrl}${imagePath}";
     print("Image URL: $imageUrl");
-    return Container(
-      width: 240,
-      color: Colors.grey,
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-           CircleAvatar(
-              radius: 25,
+    return Card(
+      elevation: 5,
+      child: Container(
+        width: 220,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 30,
               backgroundColor: Colors.blue,
               backgroundImage:
                   imageUrl != null ? NetworkImage(imageUrl!) : null,
-              onBackgroundImageError: (exception, stackTrace) {
-                print("Erreur image : $exception");
-              },
+              onBackgroundImageError: (_, __) {},
               child:
                   imageUrl == null
-                      ? const Icon(Icons.person, size: 20, color: Colors.white)
+                      ? const Icon(Icons.person, size: 20, color: Colors.grey)
                       : null,
             ),
-          const SizedBox(height: 8),
-          ListTile(
-            title: Text(noms ?? ''),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [Text(email ?? ''), Text(fonction ?? '')],
+            const SizedBox(height: 8),
+            ListTile(
+              title: Text(noms ?? ''),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [Text(email ?? ''), Text(fonction ?? '')],
+              ),
             ),
-          ),
-          const SizedBox(height: 50),
-          SideMenuItem(
-            icon: Icons.dashboard,
-            label: 'Dashboard',
-            isDarkMode: widget.isDarkMode,
-            isActive: selectedIndex == 0,
-            onTap: () => handleItemSelected(0, Statuts()),
-          ),
-          SideMenuItem(
-            icon: Icons.person_2_outlined,
-            label: 'Administrateurs',
-            isDarkMode: widget.isDarkMode,
-            isActive: selectedIndex == 1,
-            onTap: () => handleItemSelected(1, const AddAdmin()),
-          ),
-          SideMenuItem(
-            icon: Icons.list_alt,
-            label: 'Listes',
-            isDarkMode: widget.isDarkMode,
-            isActive: selectedIndex == 2,
-            onTap: () => handleItemSelected(2, Statuts()),
-          ),
-          SideMenuItem(
-            icon: Icons.report,
-            label: 'Rapports',
-            isDarkMode: widget.isDarkMode,
-            isActive: selectedIndex == 3,
-            onTap: () => handleItemSelected(3, Statuts()),
-          ),
-          SideMenuItem(
-            icon: Icons.login_outlined,
-            label: 'Deconnexion',
-            isDarkMode: widget.isDarkMode,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => MyLogin()),
-              );
-            },
-          ),
-        ],
+            const SizedBox(height: 50),
+            SideMenuItem(
+              icon: Icons.dashboard,
+              label: 'Dashboard',
+              isDarkMode: widget.isDarkMode,
+              isActive: selectedIndex == 0,
+              onTap: () => handleItemSelected(0, DashboardPage()),
+            ),
+            SideMenuItem(
+              icon: Icons.person_2_outlined,
+              label: 'Administrateurs',
+              isDarkMode: widget.isDarkMode,
+              isActive: selectedIndex == 1,
+              onTap: () => handleItemSelected(1, const AddAdmin()),
+            ),
+            SideMenuItem(
+              icon: Icons.supervised_user_circle,
+              label: 'Supervision',
+              isDarkMode: widget.isDarkMode,
+              isActive: selectedIndex == 2,
+              onTap: () => handleItemSelected(2, SupervisionPage()),
+            ),
+            SideMenuItem(
+              icon: Icons.report,
+              label: 'Rapports',
+              isDarkMode: widget.isDarkMode,
+              isActive: selectedIndex == 3,
+              onTap: () => handleItemSelected(3, RapportsPages()),
+            ),
+            SideMenuItem(
+              icon: Icons.login_outlined,
+              label: 'Deconnexion',
+              isDarkMode: widget.isDarkMode,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => MyLogin()),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -193,15 +198,21 @@ class SideMenuItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = isDarkMode ? Colors.blue : Colors.orange;
+    final activeColor =
+        isDarkMode
+            ? const Color.fromARGB(255, 8, 88, 153)
+            : const Color.fromARGB(255, 8, 88, 153);
     final textColor = isDarkMode ? Colors.white : Colors.black;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         leading: Icon(icon, color: isActive ? activeColor : textColor),
         title: Text(
           label,
-          style: TextStyle(color: isActive ? activeColor : textColor),
+          style: TextStyle(
+            fontSize: 13,
+            color: isActive ? activeColor : textColor,
+          ),
         ),
         tileColor: isActive ? activeColor.withOpacity(0.2) : null,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -211,32 +222,338 @@ class SideMenuItem extends StatelessWidget {
   }
 }
 
-class Statuts extends StatefulWidget {
+class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
+
   @override
-  State<Statuts> createState() => _StatutsState();
+  State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _StatutsState extends State<Statuts> {
+class _DashboardPageState extends State<DashboardPage> {
+  List<TableInfo> tableInfoList = [];
+  List<Color> colors = [
+    Colors.blue,
+    Colors.red,
+    Colors.green,
+    Colors.orange,
+    Colors.purple,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    fetchData();
+  }
+
+  Future<void> fetchData() async {
+    try {
+      final response = await http.get(
+        Uri.parse("${AppConstants.baseUrl}states.php"),
+      );
+
+      if (response.statusCode == 200) {
+        final body = response.body;
+        final decodedResponse = json.decode(body);
+
+        if (decodedResponse is List) {
+          setState(() {
+            tableInfoList =
+                decodedResponse
+                    .map((item) => TableInfo.fromJson(item))
+                    .toList();
+          });
+        } else if (decodedResponse is Map &&
+            decodedResponse.containsKey('message')) {
+          String message = decodedResponse['message'];
+          print("Message in response: $message");
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(message)));
+        } else if (decodedResponse is Map &&
+            decodedResponse.containsKey('error')) {
+          String error = decodedResponse['error'];
+          print("Error in response: $error");
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to load items: $error')),
+          );
+        } else {
+          throw const FormatException('Unexpected response format');
+        }
+      } else {
+        throw Exception('Failed to load data');
+      }
+    } catch (e) {
+      print("Error while fetching data: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to load items')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          SizedBox(height: 16),
-          Text("01 - 25 March, 2020", style: TextStyle(color: Colors.grey)),
-          SizedBox(height: 32),
-          Placeholder(fallbackHeight: 100), // Future Chart
-          SizedBox(height: 32),
-          Text(
-            "Today",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          SizedBox(height: 16),
-          Placeholder(fallbackHeight: 200), // Future list
-        ],
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title
+            Text(
+              'Dashboard',
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal[800],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Résumé Cards (Row en haut)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children:
+                    tableInfoList.asMap().entries.map((entry) {
+                      int index = entry.key;
+                      TableInfo info = entry.value;
+                      return Container(
+                        width: 200,
+                        height: 130,
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: colors[index % colors.length],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              info.recordCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 25,
+                              ),
+                            ),
+                            Text(
+                              info.tableName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // Statistiques (Column: Bar chart + Pie chart)
+            Expanded(
+              child: Row(
+                children: [
+                  // Bar Chart Card
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      height: 300,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 8,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: BarChart(
+                        BarChartData(
+                          maxY: 50,
+                          titlesData: FlTitlesData(
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (value, meta) {
+                                  int index = value.toInt();
+                                  return SideTitleWidget(
+                                    meta: meta,
+                                    child: Text(
+                                      tableInfoList.isNotEmpty &&
+                                              index < tableInfoList.length
+                                          ? tableInfoList[index].tableName
+                                          : '',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (value, meta) {
+                                  List<int> yTitles = [10, 20, 30, 40, 50];
+                                  return SideTitleWidget(
+                                    meta: meta,
+                                    child: Text(
+                                      yTitles.contains(value.toInt())
+                                          ? value.toInt().toString()
+                                          : '',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            topTitles: AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                          ),
+                          barGroups: List.generate(tableInfoList.length, (i) {
+                            return BarChartGroupData(
+                              x: i,
+                              barRods: [
+                                BarChartRodData(
+                                  toY: tableInfoList[i].recordCount.toDouble(),
+                                  color: colors[i % colors.length],
+                                  width: 15,
+                                ),
+                              ],
+                            );
+                          }),
+                          borderData: FlBorderData(show: false),
+                          gridData: FlGridData(show: false),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 20),
+                  Expanded(
+                    flex: 1,
+                    child: Container(
+                      height: 300,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 8,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Text(
+                            "Répartition par table",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Partie principale : légendes à gauche, PieChart à droite
+                          Expanded(
+                            child: Row(
+                              children: [
+                                // Légendes à gauche (en colonne)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: List.generate(
+                                    tableInfoList.length,
+                                    (i) {
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 4,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 12,
+                                              height: 12,
+                                              color: colors[i % colors.length],
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(tableInfoList[i].tableName),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 20),
+
+                                // PieChart à droite
+                                Expanded(
+                                  child: PieChart(
+                                    PieChartData(
+                                      sections: List.generate(
+                                        tableInfoList.length,
+                                        (i) {
+                                          return PieChartSectionData(
+                                            color: colors[i % colors.length],
+                                            value:
+                                                tableInfoList[i].recordCount
+                                                    .toDouble(),
+                                            title:
+                                                '${tableInfoList[i].recordCount}',
+                                            radius: 60,
+                                            titleStyle: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.white,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      sectionsSpace: 2,
+                                      centerSpaceRadius: 40,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class TableInfo {
+  final String tableName;
+  final int recordCount;
+
+  TableInfo({required this.tableName, required this.recordCount});
+
+  factory TableInfo.fromJson(Map<String, dynamic> json) {
+    return TableInfo(
+      tableName: json['table_name'] ?? 'Unknown',
+      recordCount: int.tryParse(json['record_count'].toString()) ?? 0,
     );
   }
 }

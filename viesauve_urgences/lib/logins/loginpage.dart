@@ -110,7 +110,7 @@ class _MyLoginState extends State<MyLogin> {
       body: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/login1.jpg'),
+            image: AssetImage('assets/login2.jpg'),
             fit: BoxFit.cover,
           ),
         ),

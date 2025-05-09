@@ -16,11 +16,81 @@ class AddAdmin extends StatefulWidget {
 }
 
 class _AddAdminState extends State<AddAdmin> {
+  List<Map<String, dynamic>> items = [];
+  List<Map<String, dynamic>> filteredItems = [];
+  String searchQuery = '';
+
+  final ScrollController _horizontalScrollController = ScrollController();
+  final ScrollController _verticalScrollController = ScrollController();
+
+  Future<void> fetchData() async {
+    try {
+      final response = await http.get(
+        Uri.parse("${AppConstants.baseUrl}getadmin.php"),
+      );
+
+      print("Status Code: ${response.statusCode}");
+      print("Response Body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        try {
+          final List<dynamic> decoded = json.decode(response.body);
+          setState(() {
+            items = List<Map<String, dynamic>>.from(decoded);
+            filteredItems = items;
+          });
+        } catch (jsonError) {
+          print("Erreur lors du décodage JSON: $jsonError");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Réponse invalide du serveur')),
+          );
+        }
+      } else {
+        print('Erreur HTTP: Code ${response.statusCode}');
+        throw Exception('Failed to load items');
+      }
+    } catch (e) {
+      print('Erreur catch générale: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Échec du chargement des données')),
+      );
+    }
+  }
+
+  void _filterItems(String query) {
+    setState(() {
+      searchQuery = query;
+      if (query.isEmpty) {
+        filteredItems = items;
+      } else {
+        filteredItems =
+            items.where((user) {
+              final name = '${user['noms']}';
+              return name.toLowerCase().contains(query.toLowerCase());
+            }).toList();
+      }
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    fetchData();
+    fetchSecteurs();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    _verticalScrollController.dispose();
+    super.dispose();
+  }
+
   final TextEditingController txtnoms = TextEditingController();
   final TextEditingController txtemail = TextEditingController();
   final TextEditingController txtcode = TextEditingController();
   final TextEditingController txtmot_de_passe = TextEditingController();
-  final List<String> fonctions = ['Administrateur'];
+  final List<String> fonctions = ['SuperAdmin', 'Administrateur'];
   final ImagePicker picker = ImagePicker();
   File? _imageFile;
   Uint8List? _webImage;
@@ -50,12 +120,6 @@ class _AddAdminState extends State<AddAdmin> {
   String? selectedFonction;
   String? selectedSecteurId;
   List<Map<String, dynamic>> secteurs = [];
-
-  @override
-  void initState() {
-    super.initState();
-    fetchSecteurs();
-  }
 
   Future<void> fetchSecteurs() async {
     try {
@@ -163,189 +227,133 @@ class _AddAdminState extends State<AddAdmin> {
   Widget build(BuildContext context) {
     final h = MediaQuery.of(context).size.height;
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.all(12),
-          child: Card(
-            elevation: 5,
-            child: Container(
-              height: h * 0.89,
-              width: 800,
-              child: Padding(
-                padding: const EdgeInsets.all(50.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 100),
-                      child: Text(
-                        'ENREGISTREMENT ADMINISTRATEUR',
-                        style: TextStyle(fontSize: 18),
-                      ),
-                    ),
-                    Padding(padding: EdgeInsets.only(top: 30)),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        GestureDetector(
-                          onTap: getImage,
-                          child: Container(
-                            width: 150,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              color: Colors.blue,
-                              image:
-                                  _imageFile != null || _webImage != null
-                                      ? DecorationImage(
-                                        image:
-                                            kIsWeb
-                                                ? MemoryImage(_webImage!)
-                                                : FileImage(_imageFile!)
-                                                    as ImageProvider,
-                                        fit: BoxFit.cover,
-                                      )
-                                      : null,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child:
-                                _imageFile == null && _webImage == null
-                                    ? const Icon(
-                                      Icons.add_a_photo,
-                                      size: 20,
-                                      color: Colors.white,
-                                    )
-                                    : null,
-                          ),
-                        ),
-                        const SizedBox(width: 60),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              textField("Noms", txtnoms),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  const Text("Sexe : "),
-                                  Radio<String>(
-                                    value: "M",
-                                    groupValue: sexe,
-                                    onChanged:
-                                        (val) => setState(() => sexe = val),
-                                  ),
-                                  const Text("Masculin"),
-                                  Radio<String>(
-                                    value: "F",
-                                    groupValue: sexe,
-                                    onChanged:
-                                        (val) => setState(() => sexe = val),
-                                  ),
-                                  const Text("Féminin"),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        textField("Email", txtemail),
-                        textField("Code", txtcode),
-                      ],
-                    ),
-
-                    Row(
-                      children: [
-                        dropdownField("Fonction", fonctions, selectedFonction, (
-                          value,
-                        ) {
-                          setState(() => selectedFonction = value);
-                        }),
-                        Padding(
-                          padding: const EdgeInsets.all(10.0),
-                          child: SizedBox(
-                            width: 300,
-                            child: DropdownButtonFormField<String>(
-                              value: selectedSecteurId,
-                              decoration: InputDecoration(
-                                labelText: "Secteur",
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              items:
-                                  secteurs.map((secteur) {
-                                    return DropdownMenuItem<String>(
-                                      value: secteur['id_secteur'].toString(),
-                                      child: Text(secteur['nom_secteur']),
-                                    );
-                                  }).toList(),
-
-                              onChanged: (value) {
-                                setState(() => selectedSecteurId = value);
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(
-                      width: 400,
-                      child: Padding(
-                        padding: const EdgeInsets.all(10.0),
-                        child: TextField(
-                          controller: txtmot_de_passe,
-                          obscureText: _isPasswordHidden,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _isPasswordHidden
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                                color: Colors.black,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _isPasswordHidden = !_isPasswordHidden;
-                                });
-                              },
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 25),
-                    SizedBox(
-                      width: 700,
-                      child: ElevatedButton(
-                        onPressed: enregistrerAdmin,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          "Enregistrer",
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ],
+      appBar: AppBar(
+        title: const Text(
+          'Administrateurs de vie sauve',
+          style: TextStyle(color: Colors.black),
+        ),
+      ),
+      body: Stack(
+        children: [
+          Positioned(
+            top: 10,
+            right: 10,
+            child: SizedBox(
+              width: 300,
+              child: TextField(
+                onChanged: _filterItems,
+                decoration: InputDecoration(
+                  hintText: 'Rechercher un Administrateur...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                    borderSide: const BorderSide(color: Colors.white),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  prefixIcon: const Icon(Icons.search),
                 ),
               ),
             ),
           ),
-        ),
+          SizedBox(width: 20),
+          Positioned.fill(
+            top: 80,
+            child: Scrollbar(
+              controller: _horizontalScrollController,
+              thumbVisibility: true,
+              thickness: 12.0,
+              radius: const Radius.circular(10),
+              trackVisibility: true,
+              child: SingleChildScrollView(
+                controller: _horizontalScrollController,
+                scrollDirection: Axis.horizontal,
+                child: Scrollbar(
+                  controller: _verticalScrollController,
+                  thumbVisibility: true,
+                  thickness: 12.0,
+                  radius: const Radius.circular(10),
+                  trackVisibility: true,
+                  child: SingleChildScrollView(
+                    controller: _verticalScrollController,
+                    scrollDirection: Axis.vertical,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 30),
+                      child: Card(
+                        elevation: 4,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey, width: 2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: DataTable(
+                            columnSpacing: 20.0,
+                            headingRowColor: MaterialStateProperty.all(
+                              Colors.blue.shade200,
+                            ),
+                            columns: const [
+                              DataColumn(label: Text('#')),
+                              DataColumn(label: Text('Noms')),
+                              DataColumn(label: Text('Sexe')),
+                              DataColumn(label: Text('Email')),
+                              DataColumn(label: Text('CODE')),
+                              DataColumn(label: Text('Fonction')),
+                              DataColumn(label: Text('Secteur')),
+                              DataColumn(label: Text('Actions')),
+                            ],
+                            rows: List<DataRow>.generate(filteredItems.length, (
+                              index,
+                            ) {
+                              final user = filteredItems[index];
+
+                              return DataRow(
+                                cells: [
+                                  DataCell(Text((index + 1).toString())),
+                                  DataCell(Text(user['noms'] ?? '')),
+                                  DataCell(Text(user['sexe'] ?? '')),
+                                  DataCell(Text(user['email'] ?? '')),
+                                  DataCell(Text(user['CODE'] ?? '')),
+                                  DataCell(Text(user['Fonction'] ?? '')),
+                                  DataCell(Text(user['nom_secteur'] ?? '')),
+                                  DataCell(
+                                    Row(
+                                      children: [
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            // Exemple : afficher détail
+                                          },
+                                          child: const Text('Voir'),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            // Exemple : supprimer
+                                          },
+                                          child: const Text('Supprimer'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showInsertAdminDialog(context);
+        },
+        backgroundColor: Colors.blue,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        child: const Icon(Icons.add, size: 25),
       ),
     );
   }
@@ -394,6 +402,206 @@ class _AddAdminState extends State<AddAdmin> {
           onChanged: onChanged,
         ),
       ),
+    );
+  }
+
+  Future<void> showInsertAdminDialog(BuildContext context) async {
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          insetPadding: EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: SizedBox(
+              width: 700,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Titre
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'ENREGISTREMENT ADMINISTRATEUR',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 30),
+
+                  // Image + Noms et Sexe
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        onTap: getImage,
+                        child: Container(
+                          width: 150,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: Colors.blue,
+                            image:
+                                _imageFile != null || _webImage != null
+                                    ? DecorationImage(
+                                      image:
+                                          kIsWeb
+                                              ? MemoryImage(_webImage!)
+                                              : FileImage(_imageFile!)
+                                                  as ImageProvider,
+                                      fit: BoxFit.cover,
+                                    )
+                                    : null,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child:
+                              _imageFile == null && _webImage == null
+                                  ? const Icon(
+                                    Icons.add_a_photo,
+                                    size: 20,
+                                    color: Colors.white,
+                                  )
+                                  : null,
+                        ),
+                      ),
+                      const SizedBox(width: 60),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            textField("Noms", txtnoms),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Text("Sexe : "),
+                                Radio<String>(
+                                  value: "M",
+                                  groupValue: sexe,
+                                  onChanged:
+                                      (val) => setState(() => sexe = val),
+                                ),
+                                const Text("Masculin"),
+                                Radio<String>(
+                                  value: "F",
+                                  groupValue: sexe,
+                                  onChanged:
+                                      (val) => setState(() => sexe = val),
+                                ),
+                                const Text("Féminin"),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Email + Code
+                  Row(
+                    children: [
+                      textField("Email", txtemail),
+                      textField("Code", txtcode),
+                    ],
+                  ),
+
+                  // Fonction + Secteur
+                  Row(
+                    children: [
+                      dropdownField("Fonction", fonctions, selectedFonction, (
+                        value,
+                      ) {
+                        setState(() => selectedFonction = value);
+                      }),
+                      Padding(
+                        padding: const EdgeInsets.all(10.0),
+                        child: SizedBox(
+                          width: 300,
+                          child: DropdownButtonFormField<String>(
+                            value: selectedSecteurId,
+                            decoration: InputDecoration(
+                              labelText: "Secteur",
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            items:
+                                secteurs.map((secteur) {
+                                  return DropdownMenuItem<String>(
+                                    value: secteur['id_secteur'].toString(),
+                                    child: Text(secteur['nom_secteur']),
+                                  );
+                                }).toList(),
+                            onChanged: (value) {
+                              setState(() => selectedSecteurId = value);
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Mot de passe
+                  SizedBox(
+                    width: 400,
+                    child: Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: TextField(
+                        controller: txtmot_de_passe,
+                        obscureText: _isPasswordHidden,
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isPasswordHidden
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.black,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isPasswordHidden = !_isPasswordHidden;
+                              });
+                            },
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  // Bouton Enregistrer
+                  SizedBox(
+                    width: 700,
+                    child: ElevatedButton(
+                      onPressed: enregistrerAdmin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        "Enregistrer",
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

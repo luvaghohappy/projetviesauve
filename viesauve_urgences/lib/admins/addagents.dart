@@ -16,6 +16,87 @@ class AddAgentsPages extends StatefulWidget {
 }
 
 class _AddAgentsPagesState extends State<AddAgentsPages> {
+  List<Map<String, dynamic>> items = [];
+  List<Map<String, dynamic>> filteredItems = [];
+  String searchQuery = '';
+
+  final ScrollController _horizontalScrollController = ScrollController();
+  final ScrollController _verticalScrollController = ScrollController();
+
+  Future<void> fetchData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final secteurIdStr = prefs.getString('secteur_id');
+      final fonction = prefs.getString('fonction') ?? '';
+
+      if (secteurIdStr == null || fonction.isEmpty) {
+        throw Exception('Secteur ID ou fonction manquants');
+      }
+
+      final secteurId = int.tryParse(secteurIdStr);
+      if (secteurId == null) {
+        throw Exception('Secteur ID invalide');
+      }
+
+      final response = await http.post(
+        Uri.parse("${AppConstants.baseUrl}selectagent.php"),
+        body: {'secteur_id': secteurId.toString(), 'fonction': fonction},
+      );
+
+      if (response.statusCode == 200) {
+        try {
+          final List<dynamic> decoded = json.decode(response.body);
+          setState(() {
+            items = List<Map<String, dynamic>>.from(decoded);
+            filteredItems = items;
+          });
+        } catch (jsonError) {
+          print("Erreur lors du décodage JSON: $jsonError");
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Réponse invalide du serveur')),
+          );
+        }
+      } else {
+        print('Erreur HTTP: Code ${response.statusCode}');
+        throw Exception('Échec du chargement');
+      }
+    } catch (e) {
+      print('Erreur générale: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Échec du chargement des données')),
+      );
+    }
+  }
+
+  void _filterItems(String query) {
+    setState(() {
+      searchQuery = query;
+      if (query.isEmpty) {
+        filteredItems = items;
+      } else {
+        filteredItems =
+            items.where((user) {
+              final name = '${user['noms']},${user['serviceType']}';
+              return name.toLowerCase().contains(query.toLowerCase());
+            }).toList();
+      }
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    chargerInfosDepuisPrefs();
+    fetchData();
+  }
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    _verticalScrollController.dispose();
+    super.dispose();
+  }
+
   final TextEditingController txtnoms = TextEditingController();
   final TextEditingController txtemail = TextEditingController();
   final TextEditingController txtcode = TextEditingController();
@@ -61,12 +142,6 @@ class _AddAgentsPagesState extends State<AddAgentsPages> {
   String? selectedFonction;
   String? selectedServiceType;
   List<Map<String, dynamic>> secteurs = [];
-
-  @override
-  void initState() {
-    super.initState();
-    chargerInfosDepuisPrefs();
-  }
 
   Future<void> enregistrerAdmin() async {
     // Impression des valeurs pour debug
@@ -156,15 +231,196 @@ class _AddAgentsPagesState extends State<AddAgentsPages> {
   Widget build(BuildContext context) {
     final h = MediaQuery.of(context).size.height;
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.all(12),
-          child: Card(
-            elevation: 5,
-            child: Container(
-              height: h * 0.89,
-              width: 800,
+      appBar: AppBar(
+        title: const Text(
+          'Administrateurs de vie sauve',
+          style: TextStyle(color: Colors.black),
+        ),
+      ),
+      body: Stack(
+        children: [
+          Positioned(
+            top: 10,
+            right: 10,
+            child: SizedBox(
+              width: 300,
+              child: TextField(
+                onChanged: _filterItems,
+                decoration: InputDecoration(
+                  hintText: 'Administrateur ou Service...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                    borderSide: const BorderSide(color: Colors.white),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  prefixIcon: const Icon(Icons.search),
+                ),
+              ),
+            ),
+          ),
+         
+          Positioned.fill(
+            top: 80,
+            child: Scrollbar(
+              controller: _horizontalScrollController,
+              thumbVisibility: true,
+              thickness: 12.0,
+              radius: const Radius.circular(10),
+              trackVisibility: true,
+              child: SingleChildScrollView(
+                controller: _horizontalScrollController,
+                scrollDirection: Axis.horizontal,
+                child: Scrollbar(
+                  controller: _verticalScrollController,
+                  thumbVisibility: true,
+                  thickness: 12.0,
+                  radius: const Radius.circular(10),
+                  trackVisibility: true,
+                  child: SingleChildScrollView(
+                    controller: _verticalScrollController,
+                    scrollDirection: Axis.vertical,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 30),
+                      child: Card(
+                        elevation: 4,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey, width: 2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: DataTable(
+                            columnSpacing: 20.0,
+                            headingRowColor: MaterialStateProperty.all(
+                              Colors.blue.shade200,
+                            ),
+                            columns: const [
+                              DataColumn(label: Text('#')),
+                              DataColumn(label: Text('Noms')),
+                              DataColumn(label: Text('Sexe')),
+                              DataColumn(label: Text('Email')),
+                              DataColumn(label: Text('CODE')),
+                              DataColumn(label: Text('Fonction')),
+                              DataColumn(label: Text('Service')),
+                              DataColumn(label: Text('Secteur')),
+                              DataColumn(label: Text('Actions')),
+                            ],
+                            rows: List<DataRow>.generate(filteredItems.length, (
+                              index,
+                            ) {
+                              final user = filteredItems[index];
+
+                              return DataRow(
+                                cells: [
+                                  DataCell(Text((index + 1).toString())),
+                                  DataCell(Text(user['noms'] ?? '')),
+                                  DataCell(Text(user['sexe'] ?? '')),
+                                  DataCell(Text(user['email'] ?? '')),
+                                  DataCell(Text(user['CODE'] ?? '')),
+                                  DataCell(Text(user['Fonction'] ?? '')),
+                                  DataCell(Text(user['serviceType'] ?? '')),
+                                  DataCell(Text(user['nom_secteur'] ?? '')),
+                                  DataCell(
+                                    Row(
+                                      children: [
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            // Exemple : afficher détail
+                                          },
+                                          child: const Text('Voir'),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            // Exemple : supprimer
+                                          },
+                                          child: const Text('Supprimer'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showInsertAgentDialog(context);
+        },
+        backgroundColor: Colors.blue,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        child: const Icon(Icons.add, size: 25),
+      ),
+    );
+  }
+
+  Widget textField(String label, TextEditingController controller) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: SizedBox(
+          width: 300,
+          child: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: label,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget dropdownField(
+    String label,
+    List<String> items,
+    String? value,
+    ValueChanged<String?> onChanged,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.all(10.0),
+      child: SizedBox(
+        width: 300,
+        child: DropdownButtonFormField<String>(
+          value: value,
+          decoration: InputDecoration(
+            labelText: label,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          items:
+              items
+                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                  .toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Future<void> showInsertAgentDialog(BuildContext context) async {
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          insetPadding: EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: SizedBox(
+              width: 750,
               child: Padding(
                 padding: const EdgeInsets.all(50.0),
                 child: Column(
@@ -174,7 +430,7 @@ class _AddAgentsPagesState extends State<AddAgentsPages> {
                     Padding(
                       padding: const EdgeInsets.only(left: 100),
                       child: Text(
-                        'ENREGISTREMENT ADMINISTRATEUR',
+                        'ENREGISTREMENT AGENT',
                         style: TextStyle(fontSize: 18),
                       ),
                     ),
@@ -341,55 +597,8 @@ class _AddAgentsPagesState extends State<AddAgentsPages> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget textField(String label, TextEditingController controller) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(10.0),
-        child: SizedBox(
-          width: 300,
-          child: TextField(
-            controller: controller,
-            decoration: InputDecoration(
-              labelText: label,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget dropdownField(
-    String label,
-    List<String> items,
-    String? value,
-    ValueChanged<String?> onChanged,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.all(10.0),
-      child: SizedBox(
-        width: 300,
-        child: DropdownButtonFormField<String>(
-          value: value,
-          decoration: InputDecoration(
-            labelText: label,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-          items:
-              items
-                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                  .toList(),
-          onChanged: onChanged,
-        ),
-      ),
+        );
+      },
     );
   }
 }
